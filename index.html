@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Deelrit</title>
+<meta name="description" content="Ritten bijhouden en tankbonnen eerlijk verdelen als je een auto deelt.">
+<meta name="theme-color" content="#162120">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Deelrit">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Deelrit</h1><span class="muted tagline">kilometers en tankbonnen, eerlijk verdeeld</span></div>
+    <div class="topright" id="topright" hidden>
+      <nav class="cars" id="cars" aria-label="Auto's"></nav>
+      <button class="chip ghosty" type="button" id="accountBtn" aria-haspopup="true"></button>
+    </div>
+  </header>
+
+  <div class="status" id="status" hidden></div>
+
+  <!-- Firebase nog niet ingesteld -->
+  <section class="panel" id="setup" hidden>
+    <h2>Nog één stap</h2>
+    <p>De app is nog niet gekoppeld aan een database. Vul je Firebase-gegevens in <code>firebase-config.js</code> in. Hoe dat werkt, staat in <code>README.md</code>.</p>
+  </section>
+
+  <!-- Inloggen -->
+  <section class="panel auth" id="auth" hidden>
+    <h2 id="authTitle">Inloggen</h2>
+    <p class="muted" id="authIntro">Log in om de auto's te zien die je met anderen deelt.</p>
+    <form id="authForm">
+      <label class="field" id="nameField" hidden><span class="label">Je naam</span><input id="authName" autocomplete="given-name" placeholder="Zoals de anderen je kennen"></label>
+      <label class="field"><span class="label">E-mailadres</span><input id="authEmail" type="email" autocomplete="email" required></label>
+      <label class="field"><span class="label">Wachtwoord</span><input id="authPass" type="password" autocomplete="current-password" minlength="6" required></label>
+      <button class="btn" type="submit" id="authSubmit">Inloggen</button>
+    </form>
+    <div class="inline">
+      <button class="linkbtn" type="button" id="authToggle">Nog geen account? Maak er een</button>
+      <button class="linkbtn" type="button" id="authReset">Wachtwoord vergeten</button>
+    </div>
+    <div class="or"><span>of</span></div>
+    <button class="btn ghost" type="button" id="googleBtn">Inloggen met Google</button>
+  </section>
+
+  <!-- Uitnodiging -->
+  <section class="panel" id="join" hidden>
+    <h2>Je bent uitgenodigd</h2>
+    <p class="muted">Iemand heeft je uitgenodigd om een auto te delen. Vul je naam in zoals die in het logboek moet komen.</p>
+    <form class="inline" id="joinForm">
+      <input id="joinName" placeholder="Je naam" aria-label="Je naam" required>
+      <button class="btn" type="submit">Meedoen</button>
+    </form>
+    <button class="linkbtn" type="button" id="joinCancel">Niet nu</button>
+  </section>
+
+  <!-- Account-menu -->
+  <section class="panel" id="accountMenu" hidden>
+    <div><span class="label">Ingelogd als</span><div id="accountEmail"></div></div>
+    <div class="inline"><button class="btn ghost" type="button" id="logout">Uitloggen</button></div>
+  </section>
+
+  <section class="panel" id="newcar" hidden>
+    <h2>Nieuwe auto</h2>
+    <form id="carForm">
+      <div class="row">
+        <label class="field"><span class="label">Naam</span><input id="carName" required placeholder="Bijv. de groene Polo"></label>
+        <label class="field"><span class="label">Kenteken (optioneel)</span><input id="carPlate" placeholder="AB-123-C"></label>
+        <label class="field"><span class="label">Huidige kilometerstand</span><input id="carOdo" inputmode="numeric" required placeholder="84250"></label>
+      </div>
+      <label class="field"><span class="label">Wie rijden er mee?</span><input id="carMembers" required placeholder="Namen, gescheiden door komma's: Anna, Bram, Chris"></label>
+      <div class="hint">Na het aanmaken stuur je de anderen een uitnodigingslink, zodat ze op hun eigen telefoon kunnen meedoen.</div>
+      <div class="inline"><button class="btn" type="submit">Auto aanmaken</button><button class="btn ghost" type="button" id="cancelCar">Annuleren</button></div>
+    </form>
+  </section>
+
+  <section class="empty" id="empty" hidden>
+    <h2>Nog geen auto</h2>
+    <p class="muted">Maak een auto aan en nodig de mensen uit die hem delen. Iedereen noteert zijn ritten, en wie tankt zet de bon erin. Deelrit verdeelt het bedrag naar gereden kilometers.</p>
+    <p class="muted">Heeft iemand anders de auto al aangemaakt? Open dan de uitnodigingslink die je hebt gekregen.</p>
+    <button class="btn" id="emptyAdd" type="button">Auto aanmaken</button>
+  </section>
+
+  <main id="main" hidden>
+    <section class="dash">
+      <div>
+        <div class="label">Auto</div>
+        <h2 id="carTitle"></h2>
+        <span class="plate" id="carPlateView" hidden></span>
+      </div>
+      <div>
+        <div class="label">Kilometerstand</div>
+        <div class="odo" id="odo" aria-live="polite"></div>
+      </div>
+      <label class="me"><span class="label">Ik ben</span><select id="meSel"></select></label>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="trip" id="tab-trip" type="button">Rit</button>
+          <button role="tab" aria-selected="false" data-tab="fuel" id="tab-fuel" type="button">Getankt</button>
+          <button role="tab" aria-selected="false" data-tab="pay" id="tab-pay" type="button">Terugbetaald</button>
+        </div>
+
+        <form id="tripForm" data-pane="trip">
+          <div class="row">
+            <label class="field"><span class="label">Bestuurder</span><select id="tripPerson"></select></label>
+            <label class="field"><span class="label">Datum</span><input id="tripDate" type="date"></label>
+          </div>
+          <div class="row">
+            <label class="field"><span class="label">Beginstand</span><input id="tripStart" inputmode="numeric"></label>
+            <label class="field"><span class="label">Eindstand</span><input id="tripEnd" inputmode="numeric" placeholder="Stand na je rit"></label>
+          </div>
+          <div class="hint" id="tripHint">Vul de stand van de teller in na je rit.</div>
+          <button class="btn" type="submit">Rit opslaan</button>
+        </form>
+
+        <form id="fuelForm" data-pane="fuel" hidden>
+          <div class="row">
+            <label class="field"><span class="label">Betaald door</span><select id="fuelPerson"></select></label>
+            <label class="field"><span class="label">Datum</span><input id="fuelDate" type="date"></label>
+          </div>
+          <div class="row">
+            <label class="field"><span class="label">Bedrag (€)</span><input id="fuelAmount" inputmode="decimal" placeholder="68,40"></label>
+            <label class="field"><span class="label">Liters (optioneel)</span><input id="fuelLiters" inputmode="decimal" placeholder="34,2"></label>
+          </div>
+          <div class="preview" id="fuelPreview"></div>
+          <button class="btn" type="submit">Tankbon verdelen</button>
+        </form>
+
+        <form id="payForm" data-pane="pay" hidden>
+          <div class="row">
+            <label class="field"><span class="label">Wie betaalde</span><select id="payFrom"></select></label>
+            <label class="field"><span class="label">Aan wie</span><select id="payTo"></select></label>
+          </div>
+          <div class="row">
+            <label class="field"><span class="label">Bedrag (€)</span><input id="payAmount" inputmode="decimal" placeholder="17,10"></label>
+            <label class="field"><span class="label">Datum</span><input id="payDate" type="date"></label>
+          </div>
+          <div class="hint">Leg hier vast als iemand zijn deel heeft overgemaakt. Het saldo wordt dan bijgewerkt.</div>
+          <button class="btn" type="submit">Betaling opslaan</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Saldo</h2>
+        <div class="bal" id="bal"></div>
+        <div class="settle" id="settle"></div>
+        <div class="period" id="period"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Logboek</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+
+    <section class="panel">
+      <div class="invite">
+        <div>
+          <h2>Mensen uitnodigen</h2>
+          <p class="muted">Stuur deze link naar de anderen. Na inloggen zien ze dezelfde auto en hetzelfde logboek.</p>
+        </div>
+        <button class="btn" type="button" id="inviteBtn">Uitnodigingslink delen</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <details id="manage">
+        <summary>Leden en auto beheren</summary>
+        <div class="manage-body">
+          <div class="label">Namen in het logboek</div>
+          <div class="members" id="members"></div>
+          <form class="inline" id="memberForm">
+            <input id="memberName" placeholder="Naam toevoegen" aria-label="Naam toevoegen">
+            <button class="btn" type="submit">Toevoegen</button>
+          </form>
+          <div class="hint" id="accountsHint"></div>
+          <div class="inline">
+            <button class="del" type="button" id="leaveCar">Auto verlaten</button>
+            <button class="del" type="button" id="delCar">Auto verwijderen voor iedereen</button>
+          </div>
+        </div>
+      </details>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
