@@ -130,3 +130,9 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:700;font
 .tk-list li:first-child{border-top:0}
 .tk-list li.is-me{font-weight:600}
 .copy{border:1px solid var(--line);background:var(--sunk);color:var(--ink);border-radius:6px;padding:5px 10px;font-size:.85rem;font-weight:600;min-width:88px}
+
+/* Meedoen via link of code */
+.joinpaste{display:grid;gap:8px;width:100%}
+.empty .joinpaste{border-top:1px solid var(--line);padding-top:14px;margin-top:4px}
+.code{font-size:.85rem;color:var(--muted)}
+.code span{font-family:var(--f-mono);color:var(--ink);user-select:all;overflow-wrap:anywhere}

@@ -139,32 +139,49 @@ function onUser(user){
 }
 
 /* ---------- uitnodiging ---------- */
+// Haalt het auto-id uit een geplakte link ("…?join=abc") of een losse code ("abc").
+export function parseInvite(s){
+  s = String(s || '').trim();
+  const m = s.match(/[?&]join=([^&#\s]+)/);
+  if (m) s = decodeURIComponent(m[1]);
+  return /^[A-Za-z0-9]{10,40}$/.test(s) ? s : null;
+}
+const errCode = e => String(e?.code || e?.name || 'onbekend').replace(/^firestore\//, '');
 async function startJoin(){
   const id = pendingJoin;
   try {
     const snap = await getDoc(doc(db, 'cars', id));
-    if (snap.exists()){ finishJoin(id); return; }   // al lid
+    if (snap.exists()){ toast('Je doet al mee met deze auto.'); finishJoin(id); return; }
     toast('Deze uitnodiging hoort bij een auto die niet meer bestaat.');
     finishJoin(null);
   } catch(e){
-    if (String(e.code).includes('permission-denied')){
+    console.error(e);
+    if (errCode(e) === 'permission-denied'){
+      // Normaal: je bent nog geen lid, dus je mag de auto nog niet zien.
       $('#joinName').value = (state.user.displayName || '').split(' ')[0];
       show('join');
-    } else { toast('De uitnodiging kon niet worden geopend. Controleer je verbinding.'); finishJoin(null); }
+      $('#joinName').focus();
+    } else {
+      toast(`De uitnodiging kon niet worden geopend (${errCode(e)}). Controleer je verbinding en probeer het opnieuw.`);
+      finishJoin(null);
+    }
   }
 }
 function finishJoin(carId){
   pendingJoin = null;
   try { sessionStorage.removeItem('pendingJoin'); } catch(e){}
-  history.replaceState(null, '', location.pathname);
+  if (location.search) history.replaceState(null, '', location.pathname);
   if (carId) store.set('lastCar', carId);
   show(null);
-  listenCars();
+  if (unsubCars){
+    if (carId) selectCar(carId); else render();
+  } else listenCars();
 }
 $('#joinForm').addEventListener('submit', async ev => {
   ev.preventDefault();
   const name = $('#joinName').value.trim(), id = pendingJoin;
-  if (!name) return;
+  if (!name || !id) return;
+  const btn = ev.submitter; if (btn) btn.disabled = true;
   try {
     await updateDoc(doc(db, 'cars', id), { memberUids: arrayUnion(state.user.uid), members: arrayUnion(name) });
     store.set('me:'+id, name);
@@ -172,15 +189,31 @@ $('#joinForm').addEventListener('submit', async ev => {
     finishJoin(id);
   } catch(e){
     console.error(e);
-    toast('Meedoen lukte niet. Vraag om een nieuwe uitnodigingslink.');
-  }
+    const c = errCode(e);
+    if (c === 'permission-denied') toast('De database weigert het meedoen. Controleer of de nieuwste regels uit firestore.rules gepubliceerd zijn.');
+    else if (c === 'not-found') toast('Deze auto bestaat niet meer. Vraag om een nieuwe uitnodiging.');
+    else toast(`Meedoen lukte niet (${c}). Controleer je verbinding en probeer het opnieuw.`);
+  } finally { if (btn) btn.disabled = false; }
 });
 $('#joinCancel').addEventListener('click', () => finishJoin(null));
+
+// Meedoen vanuit de app zelf: link of code plakken.
+document.querySelectorAll('[data-joinpaste]').forEach(f => f.addEventListener('submit', ev => {
+  ev.preventDefault();
+  const input = f.querySelector('input');
+  const id = parseInvite(input.value);
+  if (!id){ toast('Dit is geen geldige uitnodiging. Plak de hele link of de code.'); input.focus(); return; }
+  if (state.cars.some(c => c.id === id)){ toast('Je doet al mee met deze auto.'); input.value = ''; $('#newcar').hidden = true; selectCar(id); return; }
+  input.value = '';
+  $('#newcar').hidden = true;
+  pendingJoin = id;
+  startJoin();
+}));
 
 $('#inviteBtn').addEventListener('click', async () => {
   const c = car(); if (!c) return;
   const url = location.origin + location.pathname + '?join=' + encodeURIComponent(c.id);
-  const text = `Doe mee met ${c.name} in Deelrit, dan houden we samen de kilometers en tankbonnen bij.`;
+  const text = `Doe mee met ${c.name} in Deelrit. Open de link, of plak hem in de app bij "+ Auto" → "Meedoen" als je Deelrit al op je beginscherm hebt.`;
   if (navigator.share){
     try { await navigator.share({ title:'Deelrit', text, url }); return; } catch(e){ if (e.name === 'AbortError') return; }
   }
@@ -297,6 +330,7 @@ function render(){
   const c = car(); if (!c) return;
   const members = c.members || [];
   $('#carTitle').textContent = c.name;
+  $('#inviteCode').textContent = c.id;
   const pv = $('#carPlateView'); pv.textContent = c.plate || ''; pv.hidden = !c.plate;
 
   const km = currentKm();

@@ -1,6 +1,6 @@
 // Bewaart de app-bestanden, zodat Deelrit ook opent zonder (goede) verbinding.
 // Verhoog VERSION als je bestanden aanpast, dan krijgt iedereen de nieuwe versie.
-const VERSION = 'deelrit-v3';
+const VERSION = 'deelrit-v4';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'firebase-config.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

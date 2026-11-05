@@ -72,6 +72,15 @@
   </section>
 
   <section class="panel" id="newcar" hidden>
+    <form class="joinpaste" data-joinpaste>
+      <h2>Meedoen met een auto</h2>
+      <span class="hint">Heb je een uitnodiging gekregen? Plak de link of code hier.</span>
+      <div class="inline">
+        <input id="pasteNew" placeholder="Uitnodigingslink of code" aria-label="Uitnodigingslink of code" autocomplete="off">
+        <button class="btn" type="submit">Meedoen</button>
+      </div>
+    </form>
+    <div class="or"><span>of maak zelf een</span></div>
     <h2>Nieuwe auto</h2>
     <form id="carForm">
       <div class="row">
@@ -88,8 +97,14 @@
   <section class="empty" id="empty" hidden>
     <h2>Nog geen auto</h2>
     <p class="muted">Maak een auto aan en nodig de mensen uit die hem delen. Iedereen noteert zijn ritten, en wie tankt zet de bon erin. Deelrit verdeelt het bedrag naar gereden kilometers.</p>
-    <p class="muted">Heeft iemand anders de auto al aangemaakt? Open dan de uitnodigingslink die je hebt gekregen.</p>
     <button class="btn" id="emptyAdd" type="button">Auto aanmaken</button>
+    <form class="joinpaste" data-joinpaste>
+      <span class="label">Heeft iemand anders de auto al aangemaakt?</span>
+      <div class="inline">
+        <input id="pasteEmpty" placeholder="Uitnodigingslink of code" aria-label="Uitnodigingslink of code" autocomplete="off">
+        <button class="btn ghost" type="submit">Meedoen</button>
+      </div>
+    </form>
   </section>
 
   <main id="main" hidden>
@@ -167,7 +182,8 @@
       <div class="invite">
         <div>
           <h2>Mensen uitnodigen</h2>
-          <p class="muted">Stuur deze link naar de anderen. Na inloggen zien ze dezelfde auto en hetzelfde logboek.</p>
+          <p class="muted">Stuur deze link naar de anderen. Hebben ze de app al op hun beginscherm? Dan plakken ze de link in de app bij <b>+ Auto</b> → <b>Meedoen</b>.</p>
+          <div class="code">Code: <span id="inviteCode" class="num"></span></div>
         </div>
         <button class="btn" type="button" id="inviteBtn">Uitnodigingslink delen</button>
       </div>
