@@ -151,21 +151,25 @@ async function startJoin(){
   const id = pendingJoin;
   try {
     const snap = await getDoc(doc(db, 'cars', id));
-    if (snap.exists()){ toast('Je doet al mee met deze auto.'); finishJoin(id); return; }
-    toast('Deze uitnodiging hoort bij een auto die niet meer bestaat.');
-    finishJoin(null);
+    if (!snap.exists()){ toast('Deze uitnodiging hoort bij een auto die niet meer bestaat.'); finishJoin(null); return; }
+    // Kunnen zien betekent niet altijd lid zijn (bijv. als de database nog in testmodus staat): controleer de ledenlijst.
+    if ((snap.data().memberUids || []).includes(state.user.uid)){ toast('Je doet al mee met deze auto.'); finishJoin(id); return; }
+    showJoinForm();
   } catch(e){
     console.error(e);
     if (errCode(e) === 'permission-denied'){
       // Normaal: je bent nog geen lid, dus je mag de auto nog niet zien.
-      $('#joinName').value = (state.user.displayName || '').split(' ')[0];
-      show('join');
-      $('#joinName').focus();
+      showJoinForm();
     } else {
       toast(`De uitnodiging kon niet worden geopend (${errCode(e)}). Controleer je verbinding en probeer het opnieuw.`);
       finishJoin(null);
     }
   }
+}
+function showJoinForm(){
+  $('#joinName').value = (state.user.displayName || '').split(' ')[0];
+  show('join');
+  $('#joinName').focus();
 }
 function finishJoin(carId){
   pendingJoin = null;
