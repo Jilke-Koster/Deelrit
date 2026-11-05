@@ -161,7 +161,9 @@ async function startJoin(){
       // Normaal: je bent nog geen lid, dus je mag de auto nog niet zien.
       showJoinForm();
     } else {
-      toast(`De uitnodiging kon niet worden geopend (${errCode(e)}). Controleer je verbinding en probeer het opnieuw.`);
+      toast(errCode(e) === 'unavailable'
+        ? 'De uitnodiging is niet te vinden: de database is niet bereikbaar of de auto is nooit opgeslagen in Firebase. Vraag de maker om de README-stap "Database aanmaken" te controleren.'
+        : `De uitnodiging kon niet worden geopend (${errCode(e)}). Controleer je verbinding en probeer het opnieuw.`);
       finishJoin(null);
     }
   }
@@ -230,10 +232,16 @@ function listenCars(){
   if (unsubCars) return;
   status('Gegevens laden…');
   const q = query(collection(db, 'cars'), where('memberUids', 'array-contains', state.user.uid));
-  unsubCars = onSnapshot(q, snap => {
+  // Waarschuw als de database na 12 seconden nog steeds niet bereikbaar is.
+  let reached = false;
+  const noServer = () => { if (!reached && navigator.onLine) status('Deelrit kan de database niet bereiken. Wat je nu invoert, staat alleen op deze telefoon en de anderen zien het niet. Controleer in Firebase of de Firestore-database is aangemaakt (zie de README).'); };
+  let serverTimer = setTimeout(noServer, 12000);
+  unsubCars = onSnapshot(q, { includeMetadataChanges: true }, snap => {
+    if (!snap.metadata.fromCache){ reached = true; clearTimeout(serverTimer); }
     state.cars = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
     state.carsLoaded = true;
-    status('');
+    if (reached || !navigator.onLine) status(navigator.onLine ? '' : $('#status').textContent);
+    else if (!$('#status').textContent.startsWith('Deelrit kan')) status('');
     if (!car()){
       const last = store.get('lastCar');
       const pick = state.cars.find(c => c.id === last) || state.cars[0];
