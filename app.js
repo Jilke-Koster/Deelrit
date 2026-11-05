@@ -206,6 +206,7 @@ function listenCars(){
 }
 function selectCar(id){
   state.carId = id; state.entries = [];
+  tripPicked = null;
   store.set('lastCar', id);
   $('#tripStart').dataset.touched = '';
   if (unsubEntries) unsubEntries();
@@ -219,18 +220,42 @@ function selectCar(id){
 /* ---------- rekenen ---------- */
 const car = () => state.cars.find(c => c.id === state.carId);
 const sorted = () => [...state.entries].sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+// Wie zaten in de auto? Oudere ritten hebben één 'person', nieuwe een lijst 'people'.
+const peopleOf = e => (e.people && e.people.length) ? e.people : (e.person ? [e.person] : []);
+const ALL = '__iedereen';
 function currentKm(){
   let km = Number(car()?.odoStart) || 0;
-  for (const e of state.entries) if (e.type === 'trip') km = Math.max(km, e.endKm || 0);
+  for (const e of state.entries){
+    if (e.type === 'trip') km = Math.max(km, e.endKm || 0);
+    if (e.type === 'fuel' && e.odometer) km = Math.max(km, e.odometer);
+  }
   return km;
 }
-function openPeriod(){
-  const es = sorted(); let last = -1;
+// Kilometers per persoon sinds de laatste tankbeurt. Samen gereden km worden gelijk gedeeld.
+export function kmSinceFuel(entries){
+  const es = [...entries].sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+  let last = -1;
   es.forEach((e,i) => { if (e.type === 'fuel') last = i; });
   const kmBy = {};
-  for (const t of es.slice(last+1)) if (t.type === 'trip') kmBy[t.person] = (kmBy[t.person]||0) + (t.endKm - t.startKm);
+  for (const t of es.slice(last+1)){
+    if (t.type !== 'trip') continue;
+    const ppl = peopleOf(t); if (!ppl.length) continue;
+    const each = (t.endKm - t.startKm) / ppl.length;
+    for (const p of ppl) kmBy[p] = (kmBy[p]||0) + each;
+  }
   return kmBy;
 }
+const openPeriod = () => kmSinceFuel(state.entries);
+// Ontbrekende kilometers: de nieuwe stand ligt hoger dan de laatst bekende.
+function gapFor(newStart){ const last = currentKm(); return (!isNaN(newStart) && newStart > last) ? { from:last, to:newStart, km:newStart-last } : null; }
+function gapPeople(sel){ return sel.value === ALL ? [...(car()?.members||[])] : [sel.value]; }
+function fillGapSelect(sel){
+  const members = car()?.members || [];
+  const cur = sel.value;
+  sel.innerHTML = `<option value="${ALL}">Weet ik niet, verdeel over iedereen</option>` + members.map(n => `<option>${esc(n)}</option>`).join('');
+  sel.value = (cur === ALL || members.includes(cur)) ? cur : ALL;
+}
+let tripPicked = null; // namen die aangevinkt zijn in het ritformulier
 export function splitCents(cents, kmBy, members){
   let weights = Object.fromEntries(Object.entries(kmBy).filter(([,k]) => k > 0));
   let byKm = true;
@@ -243,33 +268,8 @@ export function splitCents(cents, kmBy, members){
   for (let i=0; rest>0 && raw.length; i=(i+1)%raw.length, rest--) raw[i].c++;
   return { shares: Object.fromEntries(raw.map(r => [r.n, r.c])), byKm };
 }
-function balances(){
-  const b = {};
-  (car()?.members||[]).forEach(m => b[m]=0);
-  for (const e of state.entries){
-    if (e.type === 'fuel'){
-      b[e.person] = (b[e.person]||0) + e.amountCents;
-      for (const [n,c] of Object.entries(e.shares||{})) b[n] = (b[n]||0) - c;
-    } else if (e.type === 'pay'){
-      b[e.from] = (b[e.from]||0) + e.amountCents;
-      b[e.to] = (b[e.to]||0) - e.amountCents;
-    }
-  }
-  return b;
-}
-function settle(b){
-  const cred = Object.entries(b).filter(([,v])=>v>0).map(([n,v])=>({n,v})).sort((a,b)=>b.v-a.v);
-  const debt = Object.entries(b).filter(([,v])=>v<0).map(([n,v])=>({n,v:-v})).sort((a,b)=>b.v-a.v);
-  const out = []; let i=0, j=0;
-  while (i<debt.length && j<cred.length){
-    const x = Math.min(debt[i].v, cred[j].v);
-    if (x>0) out.push({ from:debt[i].n, to:cred[j].n, c:x });
-    debt[i].v -= x; cred[j].v -= x;
-    if (!debt[i].v) i++;
-    if (!cred[j].v) j++;
-  }
-  return out;
-}
+const lastFuel = () => sorted().filter(e => e.type === 'fuel').pop();
+const amountText = c => (c/100).toFixed(2).replace('.', ',');
 
 /* ---------- weergave ---------- */
 function fillSelect(sel, names, preferred){
@@ -304,28 +304,36 @@ function render(){
   $('#odo').innerHTML = digits.map((d,i) => `<span class="d${i===digits.length-1?' last':''}">${d}</span>`).join('') + '<span class="u">km</span>';
 
   fillSelect($('#meSel'), members, me());
-  fillSelect($('#tripPerson'), members, me());
   fillSelect($('#fuelPerson'), members, me());
-  fillSelect($('#payFrom'), members, me());
-  fillSelect($('#payTo'), members, members.find(m => m !== $('#payFrom').value));
+  renderPeople();
+  fillGapSelect($('#tripGapWho'));
+  fillGapSelect($('#fuelGapWho'));
   const ts = $('#tripStart');
   if (!ts.dataset.touched) ts.value = km || '';
   tripHint();
+  fuelGap();
   fuelPreview();
 
-  const b = balances();
-  const max = Math.max(1, ...Object.values(b).map(Math.abs));
-  $('#bal').innerHTML = Object.keys(b).length ? Object.entries(b).sort((a,b)=>b[1]-a[1]).map(([n,v]) => {
-    const w = Math.abs(v)/max*50;
-    const bar = v>=0 ? `left:50%;width:${w}%;background:var(--pos)` : `right:50%;width:${w}%;background:var(--neg)`;
-    const word = v>0 ? 'krijgt' : v<0 ? 'moet betalen' : 'staat quitte';
-    return `<div class="bal-row"><span><b>${esc(n)}</b> <span class="muted">${word}</span></span><span class="amt num ${v>0?'pos':v<0?'neg':''}">${eur(Math.abs(v))}</span><div class="bar"><i style="${bar}"></i></div></div>`;
-  }).join('') : '<p class="muted">Nog geen leden.</p>';
-
-  const s = settle(b);
-  $('#settle').innerHTML = `<div class="label">Zo staat iedereen quitte</div>` + (s.length
-    ? `<ul>${s.map(x => `<li><b>${esc(x.from)}</b> betaalt <b>${esc(x.to)}</b> <span class="num amt">${eur(x.c)}</span></li>`).join('')}</ul>`
-    : `<span class="muted">Niemand hoeft iets te betalen.</span>`);
+  // Tikkies van de laatste tankbeurt: wie getankt heeft, ziet wie hij wat moet vragen.
+  const f = lastFuel();
+  if (!f){
+    $('#tikkie').innerHTML = `<p class="muted">Nog niet getankt. Na de eerste tankbon zie je hier aan wie je een Tikkie stuurt en voor hoeveel.</p>`;
+  } else {
+    const rows = Object.entries(f.shares || {}).filter(([n,c]) => n !== f.person && c > 0).sort((a,b) => b[1]-a[1]);
+    const iPaid = me() === f.person;
+    const mine = f.shares?.[me()];
+    const head = iPaid ? 'Stuur een Tikkie naar' : `${esc(f.person)} stuurt een Tikkie naar`;
+    $('#tikkie').innerHTML =
+      `<div class="tk-head"><span class="label">Laatste tankbeurt · ${fmtDate(f.date)}</span>
+        <div><b>${iPaid ? 'Jij' : esc(f.person)}</b> ${iPaid ? 'hebt' : 'heeft'} getankt voor <b class="num">${eur(f.amountCents)}</b></div></div>` +
+      (!iPaid && mine ? `<div class="tk-you">Jouw deel: <b class="num">${eur(mine)}</b> aan ${esc(f.person)}</div>` : '') +
+      (rows.length
+        ? `<div class="label">${head}</div><ul class="tk-list">${rows.map(([n,c]) =>
+            `<li class="${n === me() ? 'is-me' : ''}"><span>${esc(n)}${f.kmBy?.[n] ? ` <span class="muted">${kmf(f.kmBy[n])} km</span>` : ''}</span>
+             <span class="num amt">${eur(c)}</span>
+             ${iPaid ? `<button class="copy" type="button" data-copy="${amountText(c)}" aria-label="Bedrag voor ${esc(n)} kopiëren">Kopieer</button>` : ''}</li>`).join('')}</ul>`
+        : `<p class="muted">${esc(f.person)} heeft als enige gereden, dus er hoeft niemand iets te betalen.</p>`);
+  }
 
   const p = openPeriod();
   const pt = Object.values(p).reduce((a,b)=>a+b,0);
@@ -336,19 +344,25 @@ function render(){
   const es = sorted().reverse();
   $('#log').innerHTML = es.length ? es.map(e => {
     let pill, main, meta;
-    if (e.type === 'trip'){
+    if (e.type === 'trip' && e.gap){
+      const ppl = peopleOf(e), all = ppl.length > 1 && ppl.length === members.length && members.every(m => ppl.includes(m));
+      pill = '<span class="pill miss">Niet ingevuld</span>';
+      main = `${kmf(e.endKm - e.startKm)} km zonder rit`;
+      meta = `${fmtDate(e.date)} · ${kmf(e.startKm)} → ${kmf(e.endKm)} · ${all ? 'verdeeld over iedereen' : 'toegewezen aan ' + ppl.map(esc).join(', ')}`;
+    } else if (e.type === 'trip'){
+      const ppl = peopleOf(e), d = e.endKm - e.startKm;
       pill = '<span class="pill trip">Rit</span>';
-      main = `${esc(e.person)} reed ${kmf(e.endKm - e.startKm)} km`;
-      meta = `${fmtDate(e.date)} · ${kmf(e.startKm)} → ${kmf(e.endKm)}`;
+      main = ppl.length > 1
+        ? `${ppl.map(esc).join(' en ').replace(/ en (?=.* en )/g, ', ')} reden samen ${kmf(d)} km`
+        : `${esc(ppl[0])} reed ${kmf(d)} km`;
+      meta = `${fmtDate(e.date)} · ${kmf(e.startKm)} → ${kmf(e.endKm)}${ppl.length > 1 ? ` · ${kmf(d/ppl.length)} km per persoon` : ''}`;
     } else if (e.type === 'fuel'){
       pill = '<span class="pill fuel">Tanken</span>';
       main = `${esc(e.person)} tankte voor ${eur(e.amountCents)}${e.liters ? ` <span class="muted">(${String(e.liters).replace('.',',')} L)</span>` : ''}`;
       const parts = Object.entries(e.shares||{}).map(([n,ct]) => `${esc(n)} ${eur(ct)}${e.kmBy?.[n] ? ` (${kmf(e.kmBy[n])} km)` : ''}`).join(' · ');
-      meta = `${fmtDate(e.date)} · ${e.byKm === false ? 'gelijk verdeeld' : 'verdeeld'}: ${parts}`;
+      meta = `${fmtDate(e.date)}${e.odometer ? ` · bij ${kmf(e.odometer)} km` : ''} · ${e.byKm === false ? 'gelijk verdeeld' : 'verdeeld'}: ${parts}`;
     } else {
-      pill = '<span class="pill pay">Betaald</span>';
-      main = `${esc(e.from)} betaalde ${esc(e.to)} ${eur(e.amountCents)}`;
-      meta = fmtDate(e.date);
+      return ''; // oudere regels die niet meer gebruikt worden
     }
     return `<li>${pill}<div style="min-width:0"><div class="main">${main}</div><div class="meta">${meta}</div></div><button class="del" type="button" data-del="${esc(e.id)}">Verwijder</button></li>`;
   }).join('') : `<li style="grid-template-columns:1fr"><span class="muted">Nog niets vastgelegd. Begin met je eerste rit hierboven.</span></li>`;
@@ -358,16 +372,48 @@ function render(){
   $('#accountsHint').textContent = `${n} ${n === 1 ? 'account heeft' : 'accounts hebben'} toegang tot deze auto.`;
 }
 
+function renderPeople(){
+  const members = car()?.members || [];
+  if (!tripPicked) tripPicked = new Set(me() ? [me()] : []);
+  for (const n of [...tripPicked]) if (!members.includes(n)) tripPicked.delete(n);
+  $('#tripPeople').innerHTML = members.map((n,i) =>
+    `<label><input type="checkbox" id="pp${i}" value="${esc(n)}" ${tripPicked.has(n) ? 'checked' : ''}>${esc(n)}</label>`).join('');
+  peopleHint();
+}
+function peopleHint(){
+  const n = tripPicked?.size || 0;
+  const e = parseNum($('#tripEnd').value), s = parseNum($('#tripStart').value);
+  const d = (!isNaN(e) && !isNaN(s) && e > s) ? e - s : 0;
+  $('#peopleHint').textContent = n > 1
+    ? (d ? `Samen ${kmf(d)} km, dat is ${kmf(d/n)} km per persoon.` : `Jullie delen de kilometers van deze rit met ${({2:"z'n tweeën",3:"z'n drieën",4:"z'n vieren",5:"z'n vijven"})[n] || n + ' personen'}.`)
+    : 'Rijden jullie samen? Vink iedereen aan, dan worden de kilometers gedeeld.';
+}
 function tripHint(){
   const s = parseNum($('#tripStart').value), e = parseNum($('#tripEnd').value);
-  const h = $('#tripHint');
-  if (!isNaN(s) && !isNaN(e)) h.textContent = e > s ? `Dat is ${kmf(e-s)} km.` : 'De eindstand moet hoger zijn dan de beginstand.';
-  else h.textContent = 'Vul de stand van de teller in na je rit.';
+  const h = $('#tripHint'), last = currentKm();
+  const g = gapFor(s);
+  $('#tripGap').hidden = !g;
+  if (g) $('#tripGapText').innerHTML = `<b>Er missen ${kmf(g.km)} km.</b> De laatst bekende stand is ${kmf(g.from)}, maar je beginstand is ${kmf(g.to)}. Iemand is vergeten zijn rit in te vullen.`;
+  if (!isNaN(s) && s < last) h.textContent = `Let op: je beginstand is lager dan de laatst bekende stand (${kmf(last)}). Zo worden kilometers dubbel geteld.`;
+  else if (!isNaN(s) && !isNaN(e)) h.textContent = e > s ? `Dat is ${kmf(e-s)} km.` : 'De eindstand moet hoger zijn dan de beginstand.';
+  else h.textContent = 'De beginstand is de laatst bekende stand. Klopt die niet met de teller? Pas hem aan.';
+  peopleHint();
+}
+function fuelGap(){
+  const g = gapFor(parseNum($('#fuelOdo').value));
+  $('#fuelGap').hidden = !g;
+  if (g) $('#fuelGapText').innerHTML = `<b>Er missen ${kmf(g.km)} km.</b> De laatst bekende stand is ${kmf(g.from)}. Die kilometers tellen mee in deze tankbon.`;
+}
+// De ritten van deze periode plus eventuele ontbrekende km uit het tankformulier.
+function periodWithFuelGap(){
+  const g = gapFor(parseNum($('#fuelOdo').value));
+  if (!g) return openPeriod();
+  return kmSinceFuel([...state.entries, { type:'trip', people:gapPeople($('#fuelGapWho')), startKm:g.from, endKm:g.to, createdAt:Date.now() }]);
 }
 function fuelPreview(){
   const c = car(); if (!c) return;
   const amt = parseNum($('#fuelAmount').value);
-  const p = openPeriod();
+  const p = periodWithFuelGap();
   const box = $('#fuelPreview');
   if (isNaN(amt) || amt <= 0){
     const pt = Object.values(p).reduce((a,b)=>a+b,0);
@@ -385,6 +431,12 @@ const entriesCol = () => collection(db, 'cars', state.carId, 'entries');
 
 document.addEventListener('click', ev => {
   const t = ev.target.closest('button'); if (!t) return;
+  if (t.dataset.copy){
+    navigator.clipboard.writeText(t.dataset.copy)
+      .then(() => { t.textContent = 'Gekopieerd'; setTimeout(() => t.textContent = 'Kopieer', 1800); })
+      .catch(() => toast(`Bedrag: € ${t.dataset.copy}`));
+    return;
+  }
   if (t.dataset.car){ $('#accountMenu').hidden = true; selectCar(t.dataset.car); return; }
   if (t.id === 'addCar' || t.id === 'emptyAdd'){
     $('#newcar').hidden = false; $('#empty').hidden = true; $('#accountMenu').hidden = true;
@@ -446,8 +498,20 @@ function confirmTap(btn, label){
 $('#meSel').addEventListener('change', e => { store.set('me:'+state.carId, e.target.value); render(); });
 $('#tripStart').addEventListener('input', e => { e.target.dataset.touched = '1'; tripHint(); });
 $('#tripEnd').addEventListener('input', tripHint);
+$('#tripPeople').addEventListener('change', e => {
+  if (e.target.type !== 'checkbox') return;
+  if (e.target.checked) tripPicked.add(e.target.value); else tripPicked.delete(e.target.value);
+  peopleHint();
+});
 $('#fuelAmount').addEventListener('input', fuelPreview);
-$('#payFrom').addEventListener('change', () => { const m = car()?.members || []; fillSelect($('#payTo'), m, m.find(x => x !== $('#payFrom').value)); });
+$('#fuelOdo').addEventListener('input', () => { fuelGap(); fuelPreview(); });
+$('#fuelGapWho').addEventListener('change', fuelPreview);
+
+// Slaat ontbrekende km op als aparte regel, vlak vóór de rit of tankbon die ze aan het licht bracht.
+function saveGap(g, sel, t){
+  fire(addDoc(entriesCol(), { type:'trip', gap:true, people:gapPeople(sel), startKm:Math.round(g.from), endKm:Math.round(g.to),
+    date:today(), createdAt:t - 1, by: state.user.uid }));
+}
 
 $('#carForm').addEventListener('submit', ev => {
   ev.preventDefault();
@@ -475,30 +539,35 @@ $('#tripForm').addEventListener('submit', ev => {
   const s = parseNum($('#tripStart').value), e = parseNum($('#tripEnd').value);
   if (isNaN(s) || isNaN(e) || e <= s){ toast('Controleer de begin- en eindstand.'); return; }
   if (e - s > 3000){ toast('Meer dan 3000 km in één rit? Controleer de standen.'); return; }
-  fire(addDoc(entriesCol(), { type:'trip', person:$('#tripPerson').value, startKm:Math.round(s), endKm:Math.round(e), date:$('#tripDate').value || today(), createdAt:Date.now(), by: state.user.uid }));
+  const people = (car().members || []).filter(n => tripPicked.has(n));
+  if (!people.length){ toast('Vink aan wie er mee reden.'); return; }
+  const t = Date.now(), g = gapFor(s);
+  if (g) saveGap(g, $('#tripGapWho'), t);
+  fire(addDoc(entriesCol(), { type:'trip', people, person:people[0], startKm:Math.round(s), endKm:Math.round(e), date:$('#tripDate').value || today(), createdAt:t, by: state.user.uid }));
   $('#tripEnd').value = ''; $('#tripStart').dataset.touched = '';
-  toast('Rit opgeslagen');
+  $('#tripGapWho').value = ALL;
+  tripPicked = null;
+  toast(g ? `Rit en ${kmf(g.km)} ontbrekende km opgeslagen` : 'Rit opgeslagen');
 });
 
 $('#fuelForm').addEventListener('submit', ev => {
   ev.preventDefault();
   const amt = parseNum($('#fuelAmount').value);
   if (isNaN(amt) || amt <= 0){ toast('Vul het bedrag van de tankbon in.'); return; }
-  const cents = Math.round(amt*100), kmBy = openPeriod();
+  const odo = parseNum($('#fuelOdo').value);
+  if (!isNaN(odo) && odo < currentKm()){ toast(`De stand bij de pomp is lager dan de laatst bekende stand (${kmf(currentKm())}). Controleer hem.`); return; }
+  const cents = Math.round(amt*100), kmBy = periodWithFuelGap();
   const { shares, byKm } = splitCents(cents, kmBy, car().members || []);
   const liters = parseNum($('#fuelLiters').value);
-  fire(addDoc(entriesCol(), { type:'fuel', person:$('#fuelPerson').value, amountCents:cents, liters:isNaN(liters) ? null : liters, shares, kmBy, byKm, date:$('#fuelDate').value || today(), createdAt:Date.now(), by: state.user.uid }));
-  $('#fuelAmount').value = ''; $('#fuelLiters').value = '';
-  toast('Tankbon verdeeld');
-});
-
-$('#payForm').addEventListener('submit', ev => {
-  ev.preventDefault();
-  const amt = parseNum($('#payAmount').value), from = $('#payFrom').value, to = $('#payTo').value;
-  if (isNaN(amt) || amt <= 0 || from === to){ toast('Kies twee verschillende personen en een bedrag.'); return; }
-  fire(addDoc(entriesCol(), { type:'pay', from, to, amountCents:Math.round(amt*100), date:$('#payDate').value || today(), createdAt:Date.now(), by: state.user.uid }));
-  $('#payAmount').value = '';
-  toast('Betaling opgeslagen');
+  const t = Date.now(), g = gapFor(odo);
+  if (g) saveGap(g, $('#fuelGapWho'), t);
+  const rounded = Object.fromEntries(Object.entries(kmBy).map(([n,k]) => [n, Math.round(k*10)/10]));
+  fire(addDoc(entriesCol(), { type:'fuel', person:$('#fuelPerson').value, amountCents:cents, liters:isNaN(liters) ? null : liters,
+    odometer:isNaN(odo) ? null : Math.round(odo), shares, kmBy:rounded, byKm, date:$('#fuelDate').value || today(), createdAt:t, by: state.user.uid }));
+  $('#fuelAmount').value = ''; $('#fuelLiters').value = ''; $('#fuelOdo').value = '';
+  $('#fuelGapWho').value = ALL;
+  toast('Tankbon verdeeld. Hieronder zie je de Tikkies.');
+  setTimeout(() => $('#tikkie').scrollIntoView({ behavior:'smooth', block:'center' }), 150);
 });
 
 $('#memberForm').addEventListener('submit', ev => {
@@ -510,7 +579,7 @@ $('#memberForm').addEventListener('submit', ev => {
   toast(`${n} is toegevoegd`);
 });
 
-['#tripDate','#fuelDate','#payDate'].forEach(s => $(s).value = today());
+['#tripDate','#fuelDate'].forEach(s => $(s).value = today());
 
 /* ---------- offline werken ---------- */
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

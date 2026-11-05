@@ -39,7 +39,7 @@ service cloud.firestore {
       match /entries/{entryId} {
         allow read, delete: if isMemberOf(carId);
         allow create, update: if isMemberOf(carId)
-          && request.resource.data.type in ['trip', 'fuel', 'pay'];
+          && request.resource.data.type in ['trip', 'fuel'];
       }
     }
   }

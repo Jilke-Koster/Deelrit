@@ -69,11 +69,20 @@ button{cursor:pointer}
 form{display:grid;gap:12px}
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .field{display:grid;gap:4px;min-width:0}
-.field input,.field select{width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px}
+.field input,.field select{width:100%;min-width:0;max-width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px}
 .hint{font-size:.85rem;color:var(--muted)}
 .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:11px 16px;font-weight:600}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.picks{border:0;margin:0;padding:0}
+.picks legend{padding:0;margin-bottom:6px}
+.checks{display:flex;flex-wrap:wrap;gap:8px}
+.checks label{display:flex;align-items:center;gap:6px;background:var(--sunk);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:500;user-select:none}
+.checks input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.checks label:has(input:checked){border-color:var(--accent);background:var(--surface);color:var(--accent);font-weight:600}
+.gap{background:var(--fuel-soft);border-left:3px solid var(--fuel);border-radius:6px;padding:10px 12px;display:grid;gap:8px;font-size:.9rem}
+.gap select{background:var(--surface)}
+.pill.miss{background:var(--fuel-soft);color:var(--fuel)}
 .preview{background:var(--fuel-soft);border-radius:8px;padding:10px 12px;font-size:.9rem;display:grid;gap:4px}
 
 .bal{display:grid;gap:8px}
@@ -92,7 +101,6 @@ form{display:grid;gap:12px}
 .pill{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:999px;text-align:center;justify-self:start}
 .pill.trip{background:var(--sunk);color:var(--accent)}
 .pill.fuel{background:var(--fuel-soft);color:var(--fuel)}
-.pill.pay{background:var(--sunk);color:var(--pos)}
 .log .main{font-weight:600}
 .log .meta{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
 .del{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 8px;font-size:.85rem}
@@ -109,3 +117,16 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:700;font
 .empty{border:1px dashed var(--line);border-radius:var(--r);padding:28px;display:grid;gap:10px;justify-items:start}
 .status{padding:12px 14px;border-radius:8px;background:var(--fuel-soft)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:500;max-width:calc(100% - 32px);z-index:20}
+
+.field input[type=date]{-webkit-appearance:none;appearance:none;min-height:44px}
+.field input[type=date]::-webkit-date-and-time-value{text-align:left}
+
+/* Tikkies */
+.tikkie{display:grid;gap:12px}
+.tk-head{display:grid;gap:2px}
+.tk-you{background:var(--fuel-soft);border-left:3px solid var(--fuel);border-radius:6px;padding:10px 12px}
+.tk-list{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.tk-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.tk-list li:first-child{border-top:0}
+.tk-list li.is-me{font-weight:600}
+.copy{border:1px solid var(--line);background:var(--sunk);color:var(--ink);border-radius:6px;padding:5px 10px;font-size:.85rem;font-weight:600;min-width:88px}

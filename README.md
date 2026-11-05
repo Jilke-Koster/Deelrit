@@ -74,10 +74,19 @@ Iedereen kiest bovenaan bij **Ik ben** wie hij is. De app onthoudt dat per telef
 
 ## Zo werkt de verdeling
 
-- Een **rit** is een begin- en eindstand van de teller.
+- Een **rit** is een begin- en eindstand van de teller. De beginstand vult de app zelf in met de laatst bekende stand.
+- **Samen rijden:** vink bij een rit iedereen aan die meereed. De kilometers worden dan gelijk over hen verdeeld (100 km met z'n tweeën = 50 km per persoon).
 - Bij een **tankbon** telt Deelrit alle ritten sinds de vorige tankbeurt op en verdeelt het bedrag naar kilometers. Zijn er geen ritten gelogd, dan wordt het bedrag gelijk verdeeld over alle namen.
-- **Saldo** laat zien wie geld krijgt en wie moet betalen, en wat de kortste manier is om quitte te staan.
-- Heeft iemand zijn deel overgemaakt, leg dat dan vast onder **Terugbetaald**.
+- Na het tanken zie je bij **Tikkies** aan wie je een Tikkie stuurt en voor hoeveel. Met **Kopieer** zet je het bedrag op je klembord, zodat je het zo in je bank-app plakt. De app houdt geen saldo bij: dat regelen jullie zelf met de Tikkies.
+
+### Als iemand vergeet zijn rit in te vullen
+
+De volgende die rijdt, ziet dat de teller hoger staat dan de laatst bekende stand. Past hij de beginstand aan naar wat er echt op de teller staat, dan meldt de app hoeveel kilometer er mist. Hij kiest dan wie die kilometers gereden heeft, of laat ze over iedereen verdelen als niemand het weet.
+
+Hetzelfde gebeurt bij tanken: vul de kilometerstand bij de pomp in, dan worden ontbrekende kilometers meteen opgemerkt en meegenomen in de verdeling van die tankbon.
+
+De ontbrekende kilometers staan als aparte regel in het logboek. Blijkt later wie ze gereden heeft, verwijder die regel dan en voer de rit alsnog in.
+
 - De app werkt ook zonder verbinding (handig in een parkeergarage). Wat je invoert, wordt verstuurd zodra je weer online bent.
 
 ## Iets aanpassen

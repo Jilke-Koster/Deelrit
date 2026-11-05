@@ -111,17 +111,22 @@
         <div class="tabs" role="tablist">
           <button role="tab" aria-selected="true" data-tab="trip" id="tab-trip" type="button">Rit</button>
           <button role="tab" aria-selected="false" data-tab="fuel" id="tab-fuel" type="button">Getankt</button>
-          <button role="tab" aria-selected="false" data-tab="pay" id="tab-pay" type="button">Terugbetaald</button>
         </div>
 
         <form id="tripForm" data-pane="trip">
-          <div class="row">
-            <label class="field"><span class="label">Bestuurder</span><select id="tripPerson"></select></label>
-            <label class="field"><span class="label">Datum</span><input id="tripDate" type="date"></label>
-          </div>
+          <fieldset class="field picks">
+            <legend class="label">Wie reden er mee?</legend>
+            <div class="checks" id="tripPeople"></div>
+            <div class="hint" id="peopleHint">Rijden jullie samen? Vink iedereen aan, dan worden de kilometers gedeeld.</div>
+          </fieldset>
           <div class="row">
             <label class="field"><span class="label">Beginstand</span><input id="tripStart" inputmode="numeric"></label>
             <label class="field"><span class="label">Eindstand</span><input id="tripEnd" inputmode="numeric" placeholder="Stand na je rit"></label>
+            <label class="field"><span class="label">Datum</span><input id="tripDate" type="date"></label>
+          </div>
+          <div class="gap" id="tripGap" hidden>
+            <div id="tripGapText"></div>
+            <label class="field"><span class="label">Wie heeft die kilometers gereden?</span><select id="tripGapWho"></select></label>
           </div>
           <div class="hint" id="tripHint">Vul de stand van de teller in na je rit.</div>
           <button class="btn" type="submit">Rit opslaan</button>
@@ -136,28 +141,19 @@
             <label class="field"><span class="label">Bedrag (€)</span><input id="fuelAmount" inputmode="decimal" placeholder="68,40"></label>
             <label class="field"><span class="label">Liters (optioneel)</span><input id="fuelLiters" inputmode="decimal" placeholder="34,2"></label>
           </div>
+          <label class="field"><span class="label">Kilometerstand bij de pomp</span><input id="fuelOdo" inputmode="numeric" placeholder="Stand op de teller"></label>
+          <div class="gap" id="fuelGap" hidden>
+            <div id="fuelGapText"></div>
+            <label class="field"><span class="label">Wie heeft die kilometers gereden?</span><select id="fuelGapWho"></select></label>
+          </div>
           <div class="preview" id="fuelPreview"></div>
           <button class="btn" type="submit">Tankbon verdelen</button>
-        </form>
-
-        <form id="payForm" data-pane="pay" hidden>
-          <div class="row">
-            <label class="field"><span class="label">Wie betaalde</span><select id="payFrom"></select></label>
-            <label class="field"><span class="label">Aan wie</span><select id="payTo"></select></label>
-          </div>
-          <div class="row">
-            <label class="field"><span class="label">Bedrag (€)</span><input id="payAmount" inputmode="decimal" placeholder="17,10"></label>
-            <label class="field"><span class="label">Datum</span><input id="payDate" type="date"></label>
-          </div>
-          <div class="hint">Leg hier vast als iemand zijn deel heeft overgemaakt. Het saldo wordt dan bijgewerkt.</div>
-          <button class="btn" type="submit">Betaling opslaan</button>
         </form>
       </section>
 
       <section class="panel">
-        <h2>Saldo</h2>
-        <div class="bal" id="bal"></div>
-        <div class="settle" id="settle"></div>
+        <h2>Tikkies</h2>
+        <div class="tikkie" id="tikkie"></div>
         <div class="period" id="period"></div>
       </section>
     </div>

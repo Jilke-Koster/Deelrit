@@ -1,5 +1,4 @@
-// Plak hier de gegevens van je eigen Firebase-project.
-// Je vindt ze in de Firebase-console: Projectinstellingen → Algemeen → Je apps → SDK-instellingen en configuratie.
+// De gegevens van het Firebase-project "deelrit".
 // Deze waarden zijn geen geheim: de beveiliging zit in de regels uit firestore.rules.
 export const firebaseConfig = {
   apiKey: "AIzaSyDVijtAbY77j2GtVRm5ekETh_UHeUM3Ru8",
