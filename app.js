@@ -281,12 +281,19 @@ export function kmSinceFuel(entries){
 const openPeriod = () => kmSinceFuel(state.entries);
 // Ontbrekende kilometers: de nieuwe stand ligt hoger dan de laatst bekende.
 function gapFor(newStart){ const last = currentKm(); return (!isNaN(newStart) && newStart > last) ? { from:last, to:newStart, km:newStart-last } : null; }
-function gapPeople(sel){ return sel.value === ALL ? [...(car()?.members||[])] : [sel.value]; }
+function gapPeople(sel){ return sel.value ? [sel.value] : []; }
+// Ontbrekende km moeten aan iemand worden toegewezen; anders kan er niet opgeslagen worden.
+function gapMissingWho(g, sel){
+  if (!g || sel.value) return false;
+  toast(`Kies eerst wie de ontbrekende ${kmf(g.km)} km heeft gereden.`);
+  sel.focus();
+  return true;
+}
 function fillGapSelect(sel){
   const members = car()?.members || [];
   const cur = sel.value;
-  sel.innerHTML = `<option value="${ALL}">Weet ik niet, verdeel over iedereen</option>` + members.map(n => `<option>${esc(n)}</option>`).join('');
-  sel.value = (cur === ALL || members.includes(cur)) ? cur : ALL;
+  sel.innerHTML = `<option value="" disabled>Kies wie er gereden heeft</option>` + members.map(n => `<option>${esc(n)}</option>`).join('');
+  sel.value = members.includes(cur) ? cur : '';
 }
 let tripPicked = null; // namen die aangevinkt zijn in het ritformulier
 export function splitCents(cents, kmBy, members){
@@ -576,10 +583,11 @@ $('#tripForm').addEventListener('submit', ev => {
   const people = (car().members || []).filter(n => tripPicked.has(n));
   if (!people.length){ toast('Vink aan wie er mee reden.'); return; }
   const t = Date.now(), g = gapFor(s);
+  if (gapMissingWho(g, $('#tripGapWho'))) return;
   if (g) saveGap(g, $('#tripGapWho'), t);
   fire(addDoc(entriesCol(), { type:'trip', people, person:people[0], startKm:Math.round(s), endKm:Math.round(e), date:$('#tripDate').value || today(), createdAt:t, by: state.user.uid }));
   $('#tripEnd').value = ''; $('#tripStart').dataset.touched = '';
-  $('#tripGapWho').value = ALL;
+  $('#tripGapWho').value = '';
   tripPicked = null;
   toast(g ? `Rit en ${kmf(g.km)} ontbrekende km opgeslagen` : 'Rit opgeslagen');
 });
@@ -590,6 +598,7 @@ $('#fuelForm').addEventListener('submit', ev => {
   if (isNaN(amt) || amt <= 0){ toast('Vul het bedrag van de tankbon in.'); return; }
   const odo = parseNum($('#fuelOdo').value);
   if (!isNaN(odo) && odo < currentKm()){ toast(`De stand bij de pomp is lager dan de laatst bekende stand (${kmf(currentKm())}). Controleer hem.`); return; }
+  if (gapMissingWho(gapFor(odo), $('#fuelGapWho'))) return;
   const cents = Math.round(amt*100), kmBy = periodWithFuelGap();
   const { shares, byKm } = splitCents(cents, kmBy, car().members || []);
   const liters = parseNum($('#fuelLiters').value);
@@ -599,7 +608,7 @@ $('#fuelForm').addEventListener('submit', ev => {
   fire(addDoc(entriesCol(), { type:'fuel', person:$('#fuelPerson').value, amountCents:cents, liters:isNaN(liters) ? null : liters,
     odometer:isNaN(odo) ? null : Math.round(odo), shares, kmBy:rounded, byKm, date:$('#fuelDate').value || today(), createdAt:t, by: state.user.uid }));
   $('#fuelAmount').value = ''; $('#fuelLiters').value = ''; $('#fuelOdo').value = '';
-  $('#fuelGapWho').value = ALL;
+  $('#fuelGapWho').value = '';
   toast('Tankbon verdeeld. Hieronder zie je de Tikkies.');
   setTimeout(() => $('#tikkie').scrollIntoView({ behavior:'smooth', block:'center' }), 150);
 });

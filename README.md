@@ -81,7 +81,7 @@ Iedereen kiest bovenaan bij **Ik ben** wie hij is. De app onthoudt dat per telef
 
 ### Als iemand vergeet zijn rit in te vullen
 
-De volgende die rijdt, ziet dat de teller hoger staat dan de laatst bekende stand. Past hij de beginstand aan naar wat er echt op de teller staat, dan meldt de app hoeveel kilometer er mist. Hij kiest dan wie die kilometers gereden heeft, of laat ze over iedereen verdelen als niemand het weet.
+De volgende die rijdt, ziet dat de teller hoger staat dan de laatst bekende stand. Past hij de beginstand aan naar wat er echt op de teller staat, dan meldt de app hoeveel kilometer er mist. Hij kiest dan wie die kilometers gereden heeft. Zonder die keuze kun je de rit of tankbon niet opslaan, zodat de kosten nooit bij iemand terechtkomen die niet gereden heeft. Weet je het niet, vraag het dan eerst in de groep.
 
 Hetzelfde gebeurt bij tanken: vul de kilometerstand bij de pomp in, dan worden ontbrekende kilometers meteen opgemerkt en meegenomen in de verdeling van die tankbon.
 
